@@ -1,6 +1,7 @@
 const loadKakaoMapAPI = async (isMounted, onLoad, setError) => {
     try {
         if (window.kakao && window.kakao.maps) {
+            onLoad();
             return;
         }
         const API_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;

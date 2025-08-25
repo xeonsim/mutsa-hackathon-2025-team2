@@ -73,8 +73,7 @@ export default function MapView({ markers = [], setMarkers }) {
             setIsLoading(false);
         }
     };
-    // loadKakaoMapAPI(isMounted,initializeMap,setError);
-    initializeMap()
+    loadKakaoMapAPI(isMounted,initializeMap,setError);
     return () => { isMounted = false; };
   }, []);
 
