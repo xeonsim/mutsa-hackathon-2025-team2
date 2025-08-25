@@ -94,7 +94,7 @@ Provide informative responses in Korean. You can use Markdown for formatting lik
 
                     if (!kakaoResponse.ok) {
                         console.error(`Kakao API request failed for place: ${place.name}`);
-                        return place; // Return original on failure
+                        return; // Return original on failure
                     }
 
                     const kakaoData = await kakaoResponse.json();
