@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
         {/* - 헤더에 반투명 블러 효과를 추가하고, 부드러운 그림자와 하단 경계선으로 세련된 느낌을 줍니다.
         */}
         <header className="h-[7vh] top-0 z-50 bg-white/80 backdrop-blur-sm shadow-md border-b border-slate-200">
-          <nav className="w-full mx-auto px-6 py-4 flex justify-between items-center">
+          <nav className="w-full h-full mx-auto px-6 py-4 flex justify-between items-center">
             {/* - 앱 타이틀에 아이콘과 호버 효과를 추가하여 시각적 매력을 더합니다.
             */}
             <Link href="/" className="text-xl font-bold text-slate-900 hover:text-blue-600 transition-colors duration-200">
