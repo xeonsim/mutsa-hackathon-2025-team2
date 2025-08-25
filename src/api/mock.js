@@ -1,4 +1,3 @@
-
 // src/api/mock.js
 
 /**
@@ -59,4 +58,65 @@ export const getDefaultMarkers = async () => {
         { id: 'e', name: '코엑스', lat: 37.5127, lng: 127.0589 },
     ];
     return new Promise(resolve => setTimeout(() => resolve(markers), 500));
-}
+};
+
+/**
+ * 사용자 메시지에 대한 봇 응답을 생성합니다.
+ * @param {string} userMessage - 사용자가 입력한 메시지
+ * @param {Array<object>} conversationHistory - 현재까지의 대화 기록
+ * @returns {Promise<string>} 봇의 응답 메시지
+ */
+export const getBotResponse = async (userMessage, conversationHistory = []) => {
+  console.log("API: getBotResponse 호출됨", { userMessage, conversationHistory });
+  
+  // 간단한 키워드 기반 응답 로직
+  const lowerMessage = userMessage.toLowerCase();
+  
+  // 여행 관련 키워드들
+  if (lowerMessage.includes('서울') || lowerMessage.includes('경복궁') || lowerMessage.includes('궁궐')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '서울의 경복궁은 정말 멋진 곳이에요! 조선왕조의 정궁으로, 아름다운 전통 건축물을 볼 수 있어요. 근처에 창덕궁과 창경궁도 있어서 함께 둘러보시는 것을 추천드려요.'
+    ), 800));
+  }
+  
+  if (lowerMessage.includes('부산') || lowerMessage.includes('해운대') || lowerMessage.includes('바다')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '부산의 해운대 해수욕장은 한국에서 가장 유명한 해변 중 하나예요! 맛있는 해산물도 즐기실 수 있고, 부산타워에서 아름다운 야경도 감상하실 수 있어요.'
+    ), 800));
+  }
+  
+  if (lowerMessage.includes('제주') || lowerMessage.includes('제주도')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '제주도는 정말 아름다운 곳이에요! 한라산, 성산일출봉, 만장굴 등 자연 경관이 풍부하고, 흑돼지와 해산물도 유명해요. 렌터카로 둘러보시는 것을 추천드려요.'
+    ), 800));
+  }
+  
+  if (lowerMessage.includes('맛집') || lowerMessage.includes('음식') || lowerMessage.includes('먹을')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '한국의 음식은 정말 다양하고 맛있어요! 김치, 불고기, 비빔밥, 삼겹살 등이 유명해요. 지역별로 특색있는 음식들이 많으니, 가시는 곳의 현지 맛집을 찾아보시는 것을 추천드려요.'
+    ), 800));
+  }
+  
+  if (lowerMessage.includes('쇼핑') || lowerMessage.includes('상점') || lowerMessage.includes('물건')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '한국의 쇼핑은 정말 재미있어요! 명동, 홍대, 강남 등 지역별로 특색있는 쇼핑 거리가 있어요. 화장품, 패션, 전자제품 등 다양한 상품을 구매하실 수 있어요.'
+    ), 800));
+  }
+  
+  if (lowerMessage.includes('교통') || lowerMessage.includes('이동') || lowerMessage.includes('버스') || lowerMessage.includes('지하철')) {
+    return new Promise(resolve => setTimeout(() => resolve(
+      '한국의 대중교통은 매우 편리해요! 지하철, 버스, 택시 등이 잘 발달되어 있어요. T-money 카드를 사용하시면 더욱 편리하게 이용하실 수 있어요.'
+    ), 800));
+  }
+  
+  // 기본 응답
+  const defaultResponses = [
+    '흥미로운 질문이네요! 더 구체적으로 말씀해주시면 더 자세한 정보를 제공해드릴 수 있어요.',
+    '좋은 질문이에요! 여행 계획을 세우실 때 도움이 될 만한 정보를 더 알려드릴까요?',
+    '그 부분에 대해 더 자세히 알고 싶으시군요! 어떤 특정 지역이나 활동에 관심이 있으신가요?',
+    '멋진 계획이네요! 여행 준비에 도움이 될 만한 팁을 더 알려드릴 수 있어요.'
+  ];
+  
+  const randomResponse = defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+  return new Promise(resolve => setTimeout(() => resolve(randomResponse), 800));
+};

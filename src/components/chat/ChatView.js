@@ -8,7 +8,7 @@ import { useState } from 'react';
  * [채팅 담당자]는 이 파일에 TailwindCSS를 사용하여 디자인을 구현합니다.
  * page.js로부터 받은 props를 사용하여 UI를 렌더링하고, 사용자 인터랙션을 처리하여 부모에게 알립니다.
  */
-export default function ChatView({ messages, onSendMessage, onRecommend, isLoading }) {
+export default function ChatView({ messages, onSendMessage, onRecommend, isLoading, botTyping }) {
   const [input, setInput] = useState('');
 
   const handleSubmit = (e) => {
@@ -22,39 +22,80 @@ export default function ChatView({ messages, onSendMessage, onRecommend, isLoadi
     <div className="h-screen flex flex-col p-4 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-center">채팅</h1>
       
-      {/* 가이드라인: 메시지 목록 UI 구현 */}
+      {/* 메시지 목록 UI */}
       <div className="flex-1 overflow-y-auto bg-white p-4 rounded-lg shadow-inner">
-        {/* TODO: messages 배열을 순회하며 메시지 버블(bot, user)을 스타일링하여 보여주세요. */}
-        {messages.map(msg => (
-          <div key={msg.id} className={`chat ${msg.author === 'user' ? 'chat-end' : 'chat-start'}`}>
-             <div className="chat-bubble">
-                <p>{msg.text}</p>
-             </div>
+        {messages.map((msg) => {
+          const isUser = msg.author === 'user';
+          return (
+            <div
+              key={msg.id}
+              className={`mb-2 flex ${isUser ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[75%] rounded-2xl px-4 py-2 border shadow-sm ${
+                  isUser
+                    ? 'bg-black text-white border-white'
+                    : 'bg-white text-gray-900 border-black'
+                }`}
+              >
+                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+              </div>
+            </div>
+          );
+        })}
+        {isLoading && (
+          <p className="mt-2 text-center text-gray-500">경로를 추천받고 있습니다...</p>
+        )}
+        {botTyping && (
+          <div className="mb-2 flex justify-start">
+            <div className="max-w-[75%] rounded-2xl px-4 py-2 border shadow-sm bg-white text-gray-900 border-black">
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-500">봇이 입력 중</span>
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
-        {isLoading && <p className="text-center text-gray-500">경로를 추천받고 있습니다...</p>}
+        )}
       </div>
 
-      {/* 가이드라인: 입력 폼 및 추천 버튼 UI 구현 */}
+      {/* 입력 폼 및 추천 버튼 UI */}
       <form onSubmit={handleSubmit} className="mt-4 flex items-center gap-2">
-        {/* TODO: 입력창과 전송 버튼을 스타일링 해주세요. */}
-        <input 
+        <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="flex-1 p-2 border rounded-lg"
+          className="flex-1 h-11 px-4 border border-gray-300 rounded-full bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
           placeholder="메시지를 입력하세요..."
+          aria-label="채팅 메시지 입력"
         />
-        <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-lg">전송</button>
-        
-        {/* TODO: 추천 버튼을 스타일링 해주세요. isLoading 상태일 때 비활성화/다른 텍스트 표시 처리를 해주세요. */}
-        <button 
+        <button
+          type="submit"
+          disabled={!input.trim()}
+          className="h-11 px-5 rounded-full bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="메시지 전송"
+        >
+          전송
+        </button>
+
+        <button
           type="button"
           onClick={onRecommend}
           disabled={isLoading}
-          className="px-4 py-2 bg-green-500 text-white rounded-lg disabled:bg-green-300"
+          className="h-11 px-5 rounded-full bg-green-500 text-white border border-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="경로 추천 요청"
         >
-          {isLoading ? '분석중...' : '경로 추천'}
+          {isLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              분석중...
+            </span>
+          ) : (
+            '경로 추천'
+          )}
         </button>
       </form>
     </div>
