@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
             {/* - 앱 타이틀에 아이콘과 호버 효과를 추가하여 시각적 매력을 더합니다.
             */}
             <Link href="/" className="text-xl font-bold text-slate-900 hover:text-blue-600 transition-colors duration-200">
-              ✈️ AI 여행 플래너
+              ✈️ 여행의아이들
             </Link>
             <div>
               {/* 네비게이션 링크가 필요할 경우 여기에 추가할 수 있습니다. */}
