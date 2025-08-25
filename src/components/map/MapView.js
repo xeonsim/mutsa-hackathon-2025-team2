@@ -1,40 +1,169 @@
+// src/components/map/MapView.js
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-export default function MapView({ markers = [], onSearch }) {
+// Simple icons
+const SearchIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const HomeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
+
+// Search result component
+function SearchResult({ result, onAdd, isAdded }) {
+  return (
+    <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-gray-800 truncate">{result.place_name}</p>
+        <p className="text-sm text-gray-500 truncate">{result.road_address_name || result.address_name}</p>
+        {result.category_name && <p className="text-xs text-gray-400 truncate">{result.category_name}</p>}
+      </div>
+      <button
+        onClick={() => onAdd(result)}
+        disabled={isAdded}
+        className={`ml-3 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+          isAdded 
+            ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
+      >
+        {isAdded ? '추가됨' : <><PlusIcon /><span className="ml-1">추가</span></>}
+      </button>
+    </div>
+  );
+}
+
+// A separate component for the sortable item
+function SortablePlaceItem({ marker, index, map, mapMarkers, onRemove }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: marker.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const handleClick = () => {
+    if (map && marker.lat && marker.lng && window.kakao) {
+      const position = new window.kakao.maps.LatLng(marker.lat, marker.lng);
+      map.setCenter(position);
+      map.setLevel(3);
+
+      const targetMarker = mapMarkers[index];
+      if (targetMarker && targetMarker.infoWindow) {
+        mapMarkers.forEach(m => m.infoWindow?.close());
+        targetMarker.infoWindow.open(map, targetMarker);
+      }
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing flex items-center flex-1"
+        onClick={handleClick}
+      >
+        <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-bold rounded-full flex items-center justify-center mr-3">
+          {index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-800 truncate">{marker.name || '장소'}</p>
+          {marker.address && <p className="text-xs text-gray-500 truncate">{marker.address}</p>}
+        </div>
+      </div>
+      <button
+        onClick={() => onRemove(marker.id)}
+        className="ml-2 p-1 text-gray-500 hover:text-red-600 transition-colors"
+        title="장소 제거"
+      >
+        <TrashIcon />
+      </button>
+    </div>
+  );
+}
+
+export default function MapView({ markers = [], setMarkers }) {
   const mapContainer = useRef(null);
   const [map, setMap] = useState(null);
   const [mapMarkers, setMapMarkers] = useState([]);
   const [polyline, setPolyline] = useState(null);
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState(null);
   const [apiLoaded, setApiLoaded] = useState(false);
-  const [state, setState] = useState({
-    center: {
-      lat: 33.450701,
-      lng: 126.570667,
-    },
-    errMsg: null,
-    isLoading: true,
-  });
 
-  // 카카오 지도 API 동적 로딩 및 초기화
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // DnD drag end handler
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      setMarkers((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
+
+  // Kakao Map API Loading and Initialization
   useEffect(() => {
-    let isMounted = true; // 컴포넌트 언마운트 체크
+    let isMounted = true;
 
     const loadKakaoMapAPI = async () => {
       try {
-        // 이미 로드되어 있는지 확인
         if (window.kakao && window.kakao.maps && window.kakao.maps.Map) {
-          console.log('✅ 카카오 지도 API 이미 로드됨');
-
-          // kakao.maps.load()로 안전하게 초기화
           if (typeof window.kakao.maps.load === 'function') {
             window.kakao.maps.load(() => {
               if (isMounted) {
-                console.log('✅ 기존 API로 초기화 완료');
                 setApiLoaded(true);
                 initializeMap();
               }
@@ -48,575 +177,315 @@ export default function MapView({ markers = [], onSearch }) {
           return;
         }
 
-        console.log('🔄 카카오 지도 API 동적 로딩 시작...');
-
         const API_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+        if (!API_KEY) throw new Error('NEXT_PUBLIC_KAKAO_MAP_KEY is not set.');
 
-        if (!API_KEY) {
-          throw new Error(
-            'NEXT_PUBLIC_KAKAO_MAP_KEY 환경변수가 설정되지 않았습니다.'
-          );
-        }
-
-        console.log('🔑 API 키 확인:', API_KEY.substring(0, 8) + '...');
-
-        // 기존 카카오 스크립트 제거 (중복 방지)
-        const existingScripts = document.querySelectorAll(
-          'script[src*="dapi.kakao.com"]'
-        );
-        existingScripts.forEach((script) => script.remove());
-
-        // 새 스크립트 엘리먼트 생성
         const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${API_KEY}&autoload=false`;
+        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${API_KEY}&autoload=false&libraries=services`;
         script.async = true;
-
-        // 로드 성공 처리
         script.onload = () => {
-          console.log('✅ 카카오 스크립트 로드 완료');
-
-          if (!isMounted) return;
-
-          if (window.kakao && window.kakao.maps) {
-            console.log('🔧 kakao.maps.load() 호출');
-
+          if (isMounted && window.kakao && window.kakao.maps) {
             window.kakao.maps.load(() => {
               if (isMounted) {
-                console.log('✅ kakao.maps.load() 완료');
                 setApiLoaded(true);
                 initializeMap();
               }
             });
-          } else {
-            throw new Error('카카오 객체를 찾을 수 없습니다.');
+          } else if (isMounted) {
+            throw new Error('Failed to load Kakao Maps SDK.');
           }
         };
-
-        // 로드 실패 처리
-        script.onerror = (event) => {
-          console.error('❌ 카카오 스크립트 로드 실패');
-
-          if (!isMounted) return;
-
-          // 상세한 에러 분석
-          let errorMessage = '카카오 지도 API 로드에 실패했습니다. ';
-
-          if (!navigator.onLine) {
-            errorMessage += '인터넷 연결을 확인해주세요.';
-          } else {
-            errorMessage += '카카오 개발자 콘솔 설정을 확인해주세요.';
-          }
-
-          setError(errorMessage);
-          setIsLoading(false);
+        script.onerror = () => {
+          if (isMounted) setError('Failed to load Kakao Maps script.');
         };
-
-        // DOM에 스크립트 추가
         document.head.appendChild(script);
-
-        // 타임아웃 설정 (15초)
-        setTimeout(() => {
-          if (isMounted && (!window.kakao || !window.kakao.maps)) {
-            setError(
-              'API 로드 시간이 초과되었습니다. 새로고침 후 다시 시도해주세요.'
-            );
-            setIsLoading(false);
-          }
-        }, 15000);
-      } catch (error) {
-        console.error('❌ API 로딩 중 예외 발생:', error);
-        if (isMounted) {
-          setError(error.message);
-          setIsLoading(false);
-        }
+      } catch (err) {
+        if (isMounted) setError(err.message);
       }
     };
 
-    // 지도 초기화 함수
     const initializeMap = () => {
-      if (!mapContainer.current) {
-        setError('지도 컨테이너를 찾을 수 없습니다.');
-        setIsLoading(false);
-        return;
-      }
-
+      if (!mapContainer.current) return;
       try {
-        console.log('🗺️ 지도 인스턴스 생성 시작');
-        // 기본 좌표: 서울
-        const defaultCenter = new window.kakao.maps.LatLng(37.5665, 126.978);
-
         const mapInstance = new window.kakao.maps.Map(mapContainer.current, {
           center: new window.kakao.maps.LatLng(37.5665, 126.978),
           level: 5,
         });
-
-        console.log('✅ 지도 생성 성공!');
-
         setMap(mapInstance);
-        setError(null);
         setIsLoading(false);
-        // 사용자 위치 가져오기
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const userLatLng = new window.kakao.maps.LatLng(
-                position.coords.latitude,
-                position.coords.longitude
-              );
-              mapInstance.setCenter(userLatLng); // 지도 중심 이동
-
-              // 내 위치 마커 생성
-              const userMarker = new window.kakao.maps.Marker({
-                position: userLatLng,
-                map: mapInstance,
-                title: '현재 위치',
-              });
-
-              // 옵션: 아이콘 변경
-              const markerImage = new window.kakao.maps.MarkerImage(
-                'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-                new window.kakao.maps.Size(24, 35),
-                { offset: new window.kakao.maps.Point(12, 35) }
-              );
-              userMarker.setImage(markerImage);
-
-              setState((prev) => ({
-                ...prev,
-                center: {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                },
-                isLoading: false,
-              }));
-            },
-            (err) => {
-              console.warn('사용자 위치를 가져오지 못했습니다:', err.message);
-              setState((prev) => ({
-                ...prev,
-                errMsg: err.message,
-                isLoading: false,
-              }));
-            }
-          );
-        } else {
-          setState((prev) => ({
-            ...prev,
-            errMsg: 'geolocation을 사용할 수 없습니다.',
-            isLoading: false,
-          }));
-        }
-      } catch (error) {
-        console.error('❌ 지도 초기화 실패:', error);
-        setError(`지도 초기화에 실패했습니다: ${error.message}`);
+      } catch (err) {
+        setError('Failed to initialize map.');
         setIsLoading(false);
       }
     };
 
     loadKakaoMapAPI();
 
-    // 컴포넌트 언마운트 시 정리
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
-  // 검색 폼 제출 처리
-  const handleSearchSubmit = (e) => {
+  // Load route from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedRoute = localStorage.getItem('currentTravelRoute');
+      if (savedRoute) {
+        const routeData = JSON.parse(savedRoute);
+        setMarkers(routeData);
+      }
+    } catch (error) {
+      console.error('Failed to load route from localStorage:', error);
+    }
+  }, [setMarkers]);
+
+  // Save route to localStorage when markers change
+  useEffect(() => {
+    if (markers && markers.length > 0) {
+      try {
+        localStorage.setItem('currentTravelRoute', JSON.stringify(markers));
+      } catch (error) {
+        console.error('Failed to save route to localStorage:', error);
+      }
+    }
+  }, [markers]);
+
+  // Marker and Polyline update logic
+  useEffect(() => {
+    if (!map || !window.kakao || !apiLoaded) return;
+
+    // Clear existing overlays
+    mapMarkers.forEach((marker) => {
+      marker.setMap(null);
+      if (marker.customOverlay) marker.customOverlay.setMap(null);
+    });
+    if (polyline) polyline.setMap(null);
+
+    if (!markers || markers.length === 0) {
+      setMapMarkers([]);
+      setPolyline(null);
+      return;
+    }
+
+    const newMapMarkers = [];
+    const pathCoords = [];
+    const bounds = new window.kakao.maps.LatLngBounds();
+
+    markers.forEach((markerData, index) => {
+      if (typeof markerData.lat !== 'number' || typeof markerData.lng !== 'number') return;
+
+      const position = new window.kakao.maps.LatLng(markerData.lat, markerData.lng);
+      pathCoords.push(position);
+      bounds.extend(position);
+
+      const mapMarker = new window.kakao.maps.Marker({ position, map });
+      
+      const content = `<div style="background: #ff5722; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${index + 1}</div>`;
+      const customOverlay = new window.kakao.maps.CustomOverlay({ position, content, yAnchor: 1.2 });
+      customOverlay.setMap(map);
+
+      const infoWindow = new window.kakao.maps.InfoWindow({
+        content: `<div style="padding: 10px; min-width: 150px; text-align: center;"><strong>${index + 1}. ${markerData.name || '장소'}</strong></div>`,
+      });
+
+      window.kakao.maps.event.addListener(mapMarker, 'click', () => {
+        newMapMarkers.forEach(m => m.infoWindow?.close());
+        infoWindow.open(map, mapMarker);
+      });
+
+      mapMarker.customOverlay = customOverlay;
+      mapMarker.infoWindow = infoWindow;
+      newMapMarkers.push(mapMarker);
+    });
+
+    setMapMarkers(newMapMarkers);
+
+    if (pathCoords.length > 1) {
+      const newPolyline = new window.kakao.maps.Polyline({
+        path: pathCoords,
+        strokeWeight: 4,
+        strokeColor: '#FF5722',
+        strokeOpacity: 0.8,
+        strokeStyle: 'solid',
+      });
+      newPolyline.setMap(map);
+      setPolyline(newPolyline);
+    }
+
+    if (pathCoords.length > 0) {
+      map.setBounds(bounds, 50, 50, 50, 50);
+    }
+
+  }, [map, markers, apiLoaded]);
+
+  const handleSearchSubmit = async (e) => {
     e.preventDefault();
-    if (query.trim() && onSearch) {
-      onSearch(query.trim());
-      setQuery('');
+    if (!query.trim()) return;
+
+    setIsSearching(true);
+    try {
+      if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
+        throw new Error('카카오 지도 API가 로드되지 않았습니다.');
+      }
+
+      const ps = new window.kakao.maps.services.Places();
+      
+      await new Promise((resolve, reject) => {
+        ps.keywordSearch(query, (data, status) => {
+          if (status === window.kakao.maps.services.Status.OK) {
+            setSearchResults(data.slice(0, 5));
+            resolve();
+          } else if (status === window.kakao.maps.services.Status.ZERO_RESULT) {
+            setSearchResults([]);
+            resolve();
+          } else {
+            reject(new Error('검색 중 오류가 발생했습니다.'));
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      alert(error.message);
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  // 마커 및 경로 업데이트
-  useEffect(() => {
-    if (!map || !window.kakao || !window.kakao.maps || !apiLoaded) return;
-
-    try {
-      console.log('🔄 마커 업데이트 시작, 마커 수:', markers.length);
-
-      // 기존 마커 제거
-      mapMarkers.forEach((marker) => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-        if (marker.customOverlay) {
-          marker.customOverlay.setMap(null);
-        }
-        if (marker.infoWindow) {
-          marker.infoWindow.close();
-        }
-      });
-
-      // 기존 경로선 제거
-      if (polyline) {
-        polyline.setMap(null);
-      }
-
-      if (!markers || markers.length === 0) {
-        setMapMarkers([]);
-        setPolyline(null);
-        return;
-      }
-
-      const newMarkers = [];
-      const pathCoords = [];
-
-      // 새 마커 생성
-      markers.forEach((markerData, index) => {
-        if (
-          markerData &&
-          typeof markerData.lat === 'number' &&
-          typeof markerData.lng === 'number'
-        ) {
-          try {
-            console.log(
-              `📍 마커 ${index + 1} 생성:`,
-              markerData.name,
-              markerData.lat,
-              markerData.lng
-            );
-
-            const position = new window.kakao.maps.LatLng(
-              markerData.lat,
-              markerData.lng
-            );
-
-            // 기본 마커 생성
-            const marker = new window.kakao.maps.Marker({
-              position: position,
-              map: map,
-            });
-
-            // 마커 번호 표시를 위한 커스텀 오버레이
-            const content = `
-              <div style="
-                background: #ff5722; 
-                color: white; 
-                border-radius: 50%; 
-                width: 30px; 
-                height: 30px; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                font-weight: bold;
-                font-size: 12px;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                z-index: 10;
-              ">
-                ${index + 1}
-              </div>
-            `;
-
-            const customOverlay = new window.kakao.maps.CustomOverlay({
-              position: position,
-              content: content,
-              yAnchor: 1.2,
-            });
-
-            customOverlay.setMap(map);
-
-            // 정보창 추가
-            const infoWindow = new window.kakao.maps.InfoWindow({
-              content: `
-                <div style="padding: 10px; min-width: 150px; text-align: center;">
-                  <strong>${index + 1}. ${markerData.name || '장소'}</strong>
-                  ${
-                    markerData.address
-                      ? `<br><small style="color: #666;">${markerData.address}</small>`
-                      : ''
-                  }
-                </div>
-              `,
-            });
-
-            // 마커 클릭 이벤트
-            window.kakao.maps.event.addListener(marker, 'click', () => {
-              // 다른 정보창들 닫기
-              mapMarkers.forEach((m) => {
-                if (m.infoWindow) {
-                  m.infoWindow.close();
-                }
-              });
-              infoWindow.open(map, marker);
-            });
-
-            // 마커 객체에 참조 저장
-            marker.infoWindow = infoWindow;
-            marker.customOverlay = customOverlay;
-
-            newMarkers.push(marker);
-            pathCoords.push(position);
-          } catch (err) {
-            console.warn(`마커 ${index + 1} 생성 실패:`, err);
-          }
-        } else {
-          console.warn(`마커 ${index + 1} 데이터 오류:`, markerData);
-        }
-      });
-
-      console.log('✅ 마커 생성 완료:', newMarkers.length);
-      setMapMarkers(newMarkers);
-
-      // 경로선 그리기
-      if (pathCoords.length > 1) {
-        try {
-          const newPolyline = new window.kakao.maps.Polyline({
-            path: pathCoords,
-            strokeWeight: 4,
-            strokeColor: '#FF5722',
-            strokeOpacity: 0.8,
-            strokeStyle: 'solid',
-          });
-
-          newPolyline.setMap(map);
-          setPolyline(newPolyline);
-          console.log('✅ 경로선 생성 완료');
-        } catch (err) {
-          console.warn('경로선 생성 실패:', err);
-        }
-      }
-
-      // 지도 범위 조정
-      if (pathCoords.length > 0) {
-        try {
-          const bounds = new window.kakao.maps.LatLngBounds();
-          pathCoords.forEach((coord) => {
-            bounds.extend(coord);
-          });
-
-          map.setBounds(bounds, 50);
-          console.log('✅ 지도 범위 조정 완료');
-        } catch (err) {
-          console.warn('지도 범위 조정 실패:', err);
-        }
-      }
-    } catch (err) {
-      console.warn('마커 업데이트 실패:', err);
-    }
-  }, [map, markers, apiLoaded]);
-
-  // 컴포넌트 언마운트 시 정리
-  useEffect(() => {
-    return () => {
-      // 마커 정리
-      if (mapMarkers.length > 0) {
-        mapMarkers.forEach((marker) => {
-          if (marker.setMap) marker.setMap(null);
-          if (marker.customOverlay) marker.customOverlay.setMap(null);
-          if (marker.infoWindow) marker.infoWindow.close();
-        });
-      }
-
-      // 경로선 정리
-      if (polyline) {
-        polyline.setMap(null);
-      }
+  const handleAddPlace = (place) => {
+    const newPlace = {
+      id: place.id,
+      name: place.place_name,
+      lat: parseFloat(place.y),
+      lng: parseFloat(place.x),
+      address: place.road_address_name || place.address_name
     };
-  }, [mapMarkers, polyline]);
 
-  // 에러 화면
-  if (error) {
-    return (
-      <div className="h-screen flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="text-red-500 text-6xl mb-6">🗺️</div>
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">
-            지도 로딩 실패
-          </h2>
-          <p className="text-gray-600 mb-6 leading-relaxed">{error}</p>
+    if (markers.some(item => item.id === newPlace.id)) {
+      alert('이미 추가된 장소입니다.');
+      return;
+    }
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-blue-800 mb-2">
-              문제 해결 방법:
-            </h3>
-            <ul className="text-sm text-blue-700 text-left space-y-1">
-              <li>
-                • 카카오 개발자 콘솔에서 <strong>카카오맵 서비스 활성화</strong>
-              </li>
-              <li>
-                • 웹 플랫폼에 <code>http://localhost:3000</code> 도메인 등록
-              </li>
-              <li>
-                • <strong>JavaScript 키</strong> 사용 확인 (REST API 키 아님)
-              </li>
-              <li>• 새로운 앱 생성 후 테스트</li>
-            </ul>
-          </div>
+    setMarkers(prev => [...prev, newPlace]);
+    setSearchResults([]);
+    setQuery('');
+  };
 
-          <div className="space-x-4">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              새로고침
-            </button>
-            <button
-              onClick={() => {
-                setError(null);
-                setIsLoading(true);
-                setApiLoaded(false);
-                // 강제 재시도
-                window.location.reload();
-              }}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              강제 재시도
-            </button>
-          </div>
+  const handleRemovePlace = (placeId) => {
+    setMarkers(prev => prev.filter(item => item.id !== placeId));
+  };
 
-          {/* 디버깅 정보 */}
-          <div className="mt-6 text-xs text-gray-400">
-            <details>
-              <summary className="cursor-pointer">디버깅 정보</summary>
-              <div className="mt-2 text-left">
-                <p>
-                  API KEY:{' '}
-                  {process.env.NEXT_PUBLIC_KAKAO_MAP_KEY?.substring(0, 8)}...
-                </p>
-                <p>window.kakao: {String(!!window.kakao)}</p>
-                <p>navigator.onLine: {String(navigator.onLine)}</p>
-              </div>
-            </details>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const goToChat = () => {
+    window.location.href = '/';
+  };
+
+  if (error) return <div className="h-screen flex items-center justify-center">Error: {error}</div>;
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* 헤더 */}
+      {/* Header */}
       <div className="bg-white shadow-sm border-b p-4">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">
-          🗺️ 여행 경로 지도
-        </h1>
-
-        {/* 검색 폼 */}
-        <form
-          onSubmit={handleSearchSubmit}
-          className="max-w-2xl mx-auto flex gap-3"
-        >
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            placeholder="어디로 떠나볼까요? (예: 경복궁, 명동, 홍대)"
-            disabled={isLoading}
-          />
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-800">🗺️ 여행 경로 지도</h1>
           <button
-            type="submit"
-            disabled={isLoading || !query.trim()}
-            className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-400 transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
+            onClick={goToChat}
+            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
           >
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                검색
-              </div>
-            ) : (
-              '🔍 검색'
-            )}
+            <HomeIcon />
+            <span className="ml-2">채팅으로 돌아가기</span>
           </button>
-        </form>
+        </div>
       </div>
 
-      {/* 메인 컨텐츠 */}
-      <div className="flex-1 p-4 space-y-4">
-        {/* 지도 */}
-        <div className="flex-1 relative bg-white rounded-xl shadow-lg overflow-hidden min-h-96">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 max-w-7xl mx-auto w-full">
+        {/* Map Container */}
+        <div className="lg:col-span-2 relative bg-white rounded-xl shadow-lg overflow-hidden min-h-[400px] lg:min-h-0">
           {isLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
               <div className="text-center">
-                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">
-                  {apiLoaded
-                    ? '지도를 초기화하는 중...'
-                    : '카카오 지도 API 로딩 중...'}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  잠시만 기다려주세요
-                </p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-600">지도를 로딩 중...</p>
               </div>
             </div>
           )}
-          <div ref={mapContainer} className="w-full h-full min-h-96" />
-
-          {/* 지도 컨트롤 정보 */}
-          {!isLoading && (
-            <div className="absolute top-4 right-4 bg-white bg-opacity-90 rounded-lg p-3 shadow-md">
-              <p className="text-xs text-gray-600 mb-1">💡 지도 사용법</p>
-              <p className="text-xs text-gray-500">• 드래그: 지도 이동</p>
-              <p className="text-xs text-gray-500">• 휠: 확대/축소</p>
-              <p className="text-xs text-gray-500">• 마커 클릭: 상세 정보</p>
-            </div>
-          )}
+          <div ref={mapContainer} className="w-full h-full" />
         </div>
 
-        {/* 경로 목록 */}
-        {markers && markers.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">
-                📍 추천 여행 경로
-              </h2>
-              <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+        {/* Route Panel */}
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-800">📍 여행 경로</h2>
+            {markers.length > 0 && (
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
                 {markers.length}개 장소
               </span>
+            )}
+          </div>
+
+          {/* Search Form */}
+          <form onSubmit={handleSearchSubmit} className="mb-4 flex gap-3">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="장소 검색..."
+              disabled={isLoading || isSearching}
+            />
+            <button 
+              type="submit" 
+              disabled={isLoading || isSearching || !query.trim()} 
+              className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center"
+            >
+              <SearchIcon />
+            </button>
+          </form>
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3">검색 결과</h3>
+              <div className="space-y-2">
+                {searchResults.map((result) => (
+                  <SearchResult
+                    key={result.id}
+                    result={result}
+                    onAdd={handleAddPlace}
+                    isAdded={markers.some(item => item.id === result.id)}
+                  />
+                ))}
+              </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-40 overflow-y-auto">
-              {markers.map((marker, index) => (
-                <div
-                  key={marker.id || index}
-                  className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  onClick={() => {
-                    // 해당 마커로 지도 이동
-                    if (map && marker.lat && marker.lng && window.kakao) {
-                      const position = new window.kakao.maps.LatLng(
-                        marker.lat,
-                        marker.lng
-                      );
-                      map.setCenter(position);
-                      map.setLevel(3);
-
-                      // 해당 마커의 정보창 열기
-                      const targetMarker = mapMarkers[index];
-                      if (targetMarker && targetMarker.infoWindow) {
-                        targetMarker.infoWindow.open(map, targetMarker);
-                      }
-                    }
-                  }}
-                >
-                  <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-bold rounded-full flex items-center justify-center mr-3">
-                    {index + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 truncate">
-                      {marker.name || '장소'}
+          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+            {markers && markers.length > 0 ? (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={markers.map(m => m.id)} strategy={verticalListSortingStrategy}>
+                    <div className="flex flex-col gap-3">
+                      {markers.map((marker, index) => (
+                        <SortablePlaceItem 
+                          key={marker.id} 
+                          marker={marker} 
+                          index={index} 
+                          map={map} 
+                          mapMarkers={mapMarkers}
+                          onRemove={handleRemovePlace}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-center text-gray-500">
+                  <div>
+                    <p className="text-sm mb-2">아직 경로가 없습니다.</p>
+                    <p className="text-xs text-gray-400">
+                      채팅에서 경로를 추천받거나<br />
+                      위에서 장소를 검색해 추가하세요.
                     </p>
-                    {marker.address && (
-                      <p className="text-xs text-gray-500 truncate">
-                        {marker.address}
-                      </p>
-                    )}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-600 flex items-center">
-                <span className="w-4 h-1 bg-orange-500 rounded mr-2"></span>
-                주황색 선을 따라 여행 경로가 표시됩니다
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
