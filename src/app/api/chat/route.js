@@ -110,11 +110,11 @@ Provide informative responses in Korean. You can use Markdown for formatting lik
                     return; // Return original if no results
                 } catch (e) {
                     console.error(`Error refining coordinates for ${place.name}:`, e);
-                    return place; // Return original on error
+                    return; // Return original on error
                 }
             }));
 
-            return NextResponse.json(refinedRouteData);
+            return NextResponse.json(refinedRouteData.filter((place) => place && place.name));
             // --- END OF KAKAO API LOGIC ---
 
         } catch (e) {
