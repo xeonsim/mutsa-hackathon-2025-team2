@@ -1,9 +1,7 @@
 // src/app/layout.js
-import { Inter } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "AI Travel Planner",
@@ -15,7 +13,7 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       {/* - 전체적인 폰트 색상과 배경색을 지정하여 일관성을 유지합니다.
       */}
-      <body className={`${inter.className} bg-slate-50 text-slate-800`}>
+      <body className={`bg-slate-50 text-slate-800`}>
         {/* - 헤더에 반투명 블러 효과를 추가하고, 부드러운 그림자와 하단 경계선으로 세련된 느낌을 줍니다.
         */}
         <header className="h-[7vh] top-0 z-50 bg-white/80 backdrop-blur-sm shadow-md border-b border-slate-200">
