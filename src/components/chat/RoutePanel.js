@@ -183,7 +183,7 @@ export default function RoutePanel({ route, onRouteReorder, onRouteUpdate, onVie
   };
 
   return (
-    <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
+    <aside className="w-auto bg-white border-l border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex justify-between items-center mb-4">

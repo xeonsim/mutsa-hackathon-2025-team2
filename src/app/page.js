@@ -68,7 +68,7 @@ export default function HomePage() {
     const newChatId = `chat_${Date.now()}`;
     const newConversation = {
       id: newChatId,
-      name: `새로운 대화 ${Object.keys(conversations).length + 1}`,
+      name: `새로운 대화 ${Object.keys(conversations).length}`,
       messages: [initialBotMessage],
       route: [], // Initialize empty route
     };

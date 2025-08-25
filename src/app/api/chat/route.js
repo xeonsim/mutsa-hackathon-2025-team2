@@ -4,24 +4,18 @@ import { NextResponse } from 'next/server';
 export async function POST(req) {
   const { messages, recommend } = await req.json();
 
-  // Basic validation
   if (!messages || !Array.isArray(messages)) {
     return NextResponse.json({ error: 'Messages are required' }, { status: 400 });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    // It's better to log this on the server and return a generic error to the client.
     console.error('OpenAI API key not configured on the server.');
-    return NextResponse.json({ error: 'API key is not configured. Please contact the administrator.' }, { status: 500 });
+    return NextResponse.json({ error: 'API key is not configured.' }, { status: 500 });
   }
 
-  // The system prompt is now conditional, providing different instructions
-  // based on whether a route recommendation is requested.
   let systemPrompt;
-
   if (recommend) {
-    // This prompt is for generating a JSON route.
     systemPrompt = `You are a travel route generation assistant.
 Your ONLY task is to output a valid JSON object based on the user's conversation history.
 The JSON object must contain a single key "route" which holds an array of place objects.
@@ -29,14 +23,12 @@ Each object in the array must have the following properties: "id" (a unique stri
 ALL text values, including the 'name' field, MUST be in Korean.
 Do not include any text, markdown, or explanation outside of the JSON object.`;
   } else {
-    // This prompt is for general conversation. It explicitly forbids JSON.
     systemPrompt = `You are a friendly and helpful travel planner assistant. Your name is '여플' (Yeo-peul).
 ALL your responses MUST be in Korean.
 Your primary goal is to help users plan their trips in South Korea by having a natural, helpful, and engaging conversation.
 Provide informative responses in Korean. Do NOT output JSON or any code format. Your responses should be conversational text only.`;
   }
 
-  // Map the conversation history to the format expected by OpenAI
   const requestMessages = [
       { role: 'system', content: systemPrompt },
       ...messages.map(msg => ({ 
@@ -45,7 +37,6 @@ Provide informative responses in Korean. Do NOT output JSON or any code format. 
       }))
   ];
 
-  // If a recommendation is requested, add a final instruction to ensure JSON output.
   if (recommend) {
       requestMessages.push({
           role: 'user',
@@ -61,9 +52,8 @@ Provide informative responses in Korean. Do NOT output JSON or any code format. 
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4-turbo', // Using a model that is good with JSON outputs
+        model: 'gpt-4-turbo',
         messages: requestMessages,
-        // Use JSON mode for more reliable JSON output when recommend is true
         response_format: recommend ? { type: "json_object" } : { type: "text" },
       }),
     });
@@ -78,26 +68,61 @@ Provide informative responses in Korean. Do NOT output JSON or any code format. 
 
     const botResponseContent = data.choices[0].message.content.trim();
 
-    // If we requested a route, the response should be a JSON string.
     if (recommend) {
         try {
-            // The response from the model in JSON mode is a string that needs to be parsed.
             const parsedJson = JSON.parse(botResponseContent);
-            
-            // Extract the route array from the "route" key.
             const routeData = parsedJson.route;
 
             if (!Array.isArray(routeData)) {
-                 throw new Error("The model's JSON response did not contain a 'route' array.");
+                throw new Error("The model's JSON response did not contain a 'route' array.");
             }
-            return NextResponse.json(routeData);
+
+            // --- KAKAO API COORDINATE REFINEMENT ---
+            const kakaoApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY;
+            if (!kakaoApiKey) {
+                console.warn('KAKAO_REST_API_KEY is not set. Skipping coordinate refinement.');
+                return NextResponse.json(routeData); // Return original data if key is missing
+            }
+
+            const refinedRouteData = await Promise.all(routeData.map(async (place) => {
+                try {
+                    const searchQuery = encodeURIComponent(place.name);
+                    const kakaoResponse = await fetch(
+                        `https://dapi.kakao.com/v2/local/search/keyword.json?query=${searchQuery}&size=1`,
+                        { headers: { 'Authorization': `KakaoAK ${kakaoApiKey}` } }
+                    );
+
+                    if (!kakaoResponse.ok) {
+                        console.error(`Kakao API request failed for place: ${place.name}`);
+                        return place; // Return original on failure
+                    }
+
+                    const kakaoData = await kakaoResponse.json();
+                    if (kakaoData.documents && kakaoData.documents.length > 0) {
+                        const firstResult = kakaoData.documents[0];
+                        return {
+                            ...place,
+                            lat: parseFloat(firstResult.y),
+                            lng: parseFloat(firstResult.x),
+                            address: firstResult.road_address_name || firstResult.address_name,
+                        };
+                    }
+                    return place; // Return original if no results
+                } catch (e) {
+                    console.error(`Error refining coordinates for ${place.name}:`, e);
+                    return place; // Return original on error
+                }
+            }));
+
+            return NextResponse.json(refinedRouteData);
+            // --- END OF KAKAO API LOGIC ---
+
         } catch (e) {
             console.error('Failed to parse JSON from OpenAI response:', botResponseContent, e);
             return NextResponse.json({ error: 'The model did not return a valid JSON route. Please try again.' }, { status: 500 });
         }
     }
 
-    // For regular chat, return the text response.
     return NextResponse.json({ text: botResponseContent });
 
   } catch (error) {
