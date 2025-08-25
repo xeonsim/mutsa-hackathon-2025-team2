@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import RoutePanel from './RoutePanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
+import InitialScreen from './InitialScreen';
 // SVG Icons for UI elements
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" /></svg>;
 const DeleteIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
@@ -15,38 +15,6 @@ const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-
 const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>;
 const MenuIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" /></svg>;
 const ChevronLeftIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>;
-
-
-// --- New component for the initial empty chat screen ---
-const InitialScreen = ({ onPromptClick }) => {
-  const prompts = [
-    { title: '부산 2박 3일 여행', description: '가족과 함께할 코스로 계획 짜줘' },
-    { title: '서울 실내 데이트', description: '비 오는 날 즐길만한 곳 추천해줘' },
-    { title: '제주도 동쪽 맛집', description: '현지인들이 자주 가는 곳 위주로 알려줘' },
-    { title: '혼자 강릉 여행', description: '조용히 힐링할 수 있는 장소 포함해줘' },
-  ];
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center text-slate-600 animate-fade-in-up">
-      <div className="mb-12">
-        <h1 className="text-5xl font-bold text-slate-800 mb-2">✈️ AI 여행 플래너</h1>
-        <p className="text-2xl text-slate-500">무엇을 도와드릴까요?</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-3xl px-4">
-        {prompts.map((prompt, index) => (
-          <button
-            key={index}
-            onClick={() => onPromptClick(`${prompt.title} ${prompt.description}`)}
-            className="p-4 bg-white/60 border border-slate-200 rounded-xl hover:bg-slate-100/80 hover:border-slate-300 transition-all duration-200 text-left shadow-sm"
-          >
-            <p className="font-semibold text-slate-700">{prompt.title}</p>
-            <p className="text-sm text-slate-500">{prompt.description}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 
 export default function ChatView({ 
