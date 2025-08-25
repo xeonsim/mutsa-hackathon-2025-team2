@@ -107,7 +107,7 @@ Provide informative responses in Korean. You can use Markdown for formatting lik
                             address: firstResult.road_address_name || firstResult.address_name,
                         };
                     }
-                    return place; // Return original if no results
+                    return; // Return original if no results
                 } catch (e) {
                     console.error(`Error refining coordinates for ${place.name}:`, e);
                     return place; // Return original on error
