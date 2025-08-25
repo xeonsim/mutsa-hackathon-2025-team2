@@ -4,6 +4,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import RoutePanel from './RoutePanel';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // SVG Icons for UI elements
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" /></svg>;
@@ -207,7 +209,11 @@ export default function ChatView({
                     return (
                       <div key={msg.id} className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm ${isUser ? 'bg-blue-500 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>
-                          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                          {/* Markdown rendering applied here */}
+                          <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                          </div>
+                          
                           {msg.route && (
                             <div className="mt-3 p-3 bg-sky-50 rounded-lg border border-sky-200">
                               <p className="text-sm text-sky-800 font-semibold mb-2">
