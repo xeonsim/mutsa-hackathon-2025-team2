@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import SearchResult from './SearchResult';
 import SortablePlaceItem from './SortablePlaceItem';  
+import { loadKakaoMapAPI } from '@/services/kakaomap';
 
 // --- Icons ---
 const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
@@ -57,28 +58,6 @@ export default function MapView({ markers = [], setMarkers }) {
   // Kakao Map API Loading and Initialization
   useEffect(() => {
     let isMounted = true;
-    const loadKakaoMapAPI = async () => {
-      try {
-        if (window.kakao && window.kakao.maps) {
-            window.kakao.maps.load(() => isMounted && initializeMap());
-            return;
-        }
-        const API_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-        if (!API_KEY) throw new Error('NEXT_PUBLIC_KAKAO_MAP_KEY is not set.');
-        const script = document.createElement('script');
-        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${API_KEY}&autoload=false&libraries=services`;
-        script.async = true;
-        script.onload = () => {
-            if (isMounted && window.kakao && window.kakao.maps) {
-                window.kakao.maps.load(() => isMounted && initializeMap());
-            }
-        };
-        script.onerror = () => isMounted && setError('Failed to load Kakao Maps script.');
-        document.head.appendChild(script);
-      } catch (err) {
-        if (isMounted) setError(err.message);
-      }
-    };
     const initializeMap = () => {
         if (!mapContainer.current) return;
         try {
@@ -94,7 +73,7 @@ export default function MapView({ markers = [], setMarkers }) {
             setIsLoading(false);
         }
     };
-    loadKakaoMapAPI();
+    loadKakaoMapAPI(isMounted,initializeMap,setError);
     return () => { isMounted = false; };
   }, []);
 

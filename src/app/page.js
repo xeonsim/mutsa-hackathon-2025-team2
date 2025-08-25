@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatView from '@/components/chat/ChatView';
+import { loadKakaoMapAPI } from '@/services/kakaomap';
 
 const initialBotMessage = { 
   id: 1, 
@@ -54,6 +55,12 @@ export default function HomePage() {
       }
     }
   }, [conversations]);
+
+    useEffect(() => {
+    let isMounted = true;
+    loadKakaoMapAPI(isMounted, () => {console.log('Kakao Map API loaded');}, (error) => {console.error('Kakao Map API load error:', error);});
+    return () => { isMounted = false; };
+  }, []);
 
   // Update route when active conversation changes
   useEffect(() => {
